@@ -128,7 +128,6 @@
 
         .btn-submit:disabled { background: #bdc3c7; }
 
-        /* Modal para mostrar el ID generado */
         #modalId {
             display: none;
             position: fixed;
@@ -217,7 +216,7 @@
             <label>FOTO DEL TABLERO (KM)</label>
             <div class="camera-card" onclick="document.getElementById('f_foto').click();">
                 <span id="txt_foto">📷 Tocar para sacar foto</span>
-                <input type="file" id="f_foto" name="foto_salida" accept="image/*" capture="camera" style="display:none" required>
+                <input type="file" id="f_foto" accept="image/*" capture="camera" style="display:none">
             </div>
             <img id="preview" alt="Vista previa">
         </div>
@@ -266,11 +265,21 @@
         }
     };
 
-    // 4. Enviar datos a Google Apps Script
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbyEIGQlPc1DehfHYhVnW1YXoUFR_9C9MfPy2kvUXvFadXChN5kdD5Rr7Gg72Gdy2-M4/exec'; 
+    // 4. Función para convertir archivo a Base64 (Mejora Crítica)
+    function toBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+    }
+
+    // 5. Enviar datos a Google Apps Script
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbzzeG9Dr-9BmMA11UpfGzvpRuU4nWfV-hS9FyaOREu9tn3wo972WKfRNmRboS0zYvRT/exec'; 
     const form = document.getElementById('mainForm');
 
-    form.addEventListener('submit', e => {
+    form.addEventListener('submit', async e => {
         e.preventDefault();
         
         if (signaturePad.isEmpty()) {
@@ -280,24 +289,49 @@
 
         const btn = document.getElementById('btn_send');
         btn.disabled = true;
-        btn.innerText = "Procesando...";
+        btn.innerText = "Subiendo foto y firma...";
 
-        const formData = new FormData(form);
-        formData.append('firma_archivo', signaturePad.toDataURL());
+        try {
+            const formData = new URLSearchParams();
+            
+            // Campos normales
+            formData.append('accion', 'SALIDA');
+            formData.append('usuario', form.usuario.value);
+            formData.append('acompanantes', form.acompanantes.value);
+            formData.append('vehiculo', form.vehiculo.value);
+            formData.append('destino', form.destino.value);
+            formData.append('km_egreso', form.km_egreso.value);
+            
+            // Procesar Foto si existe
+            const fotoInput = document.getElementById('f_foto');
+            if (fotoInput.files.length > 0) {
+                const base64Foto = await toBase64(fotoInput.files[0]);
+                formData.append('foto_base64', base64Foto);
+            }
 
-        fetch(scriptURL, { method: 'POST', body: formData})
-            .then(response => response.text()) // Leemos el ID que nos devuelve el Script
-            .then(idGenerado => {
-                // Mostrar el ID en el modal
-                document.getElementById('generatedID').innerText = idGenerado;
-                document.getElementById('modalId').style.display = 'block';
-                document.getElementById('overlay').style.display = 'block';
-            })
-            .catch(error => {
-                alert("❌ Error al enviar. Verificá tu conexión.");
-                btn.disabled = false;
-                btn.innerText = "REINTENTAR ENVÍO";
+            // Procesar Firma
+            formData.append('firma_archivo', signaturePad.toDataURL());
+
+            // Enviar vía POST
+            const response = await fetch(scriptURL, { 
+                method: 'POST', 
+                mode: 'no-cors', // Importante para evitar problemas de CORS en GitHub
+                body: formData
             });
+
+            // Como usamos no-cors, no podemos leer el cuerpo de la respuesta directamente.
+            // Generamos un ID visual para el usuario basado en el tiempo
+            const idTemporal = "V-" + Date.now();
+            document.getElementById('generatedID').innerText = idTemporal;
+            document.getElementById('modalId').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+
+        } catch (error) {
+            console.error(error);
+            alert("❌ Error al enviar. Verificá tu conexión.");
+            btn.disabled = false;
+            btn.innerText = "REINTENTAR ENVÍO";
+        }
     });
 </script>
 
