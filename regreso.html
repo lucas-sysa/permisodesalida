@@ -123,7 +123,6 @@
 
         .btn-submit:disabled { background: #bdc3c7; }
 
-        /* Estilo para el ID de viaje (más grande) */
         .id-input {
             font-size: 1.2rem;
             text-align: center;
@@ -131,6 +130,7 @@
             letter-spacing: 2px;
             border: 2px solid var(--primary);
             color: var(--primary);
+            text-transform: uppercase;
         }
     </style>
 </head>
@@ -146,7 +146,7 @@
 
         <div class="form-group">
             <label>CÓDIGO DE VIAJE (ID)</label>
-            <input type="text" name="id_viaje" class="id-input" placeholder="Ej: V-171485..." required>
+            <input type="text" name="id_viaje" id="f_id_viaje" class="id-input" placeholder="Ej: V-171485..." required>
             <small style="color: #666">Ingresá el código que te dio el sistema al salir.</small>
         </div>
 
@@ -169,7 +169,6 @@
 </div>
 
 <script>
-    // --- LÓGICA DE FOTOS ACUMULADAS ---
     const inputFotos = document.getElementById('f_fotos');
     const galeria = document.getElementById('galeria_preview');
     const btnCamara = document.getElementById('btn_camara');
@@ -206,6 +205,7 @@
             btnDel.innerText = "X";
             btnDel.className = 'btn-remove';
             btnDel.onclick = (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 archivosBase64.splice(index, 1);
                 actualizarGaleria();
@@ -226,7 +226,6 @@
         });
     }
 
-    // --- ENVÍO DE DATOS AL SCRIPT ---
     const scriptURL = 'https://script.google.com/macros/s/AKfycbxa5vN8mnjmOgHCkmXN9LHTr_sHeRiCEQZUW4yNDT51nj1M3Q5uXZYHVr3Dx37ML3wr/exec'; 
     const form = document.getElementById('regresoForm');
 
@@ -235,30 +234,32 @@
         
         const btn = document.getElementById('btn_send');
         btn.disabled = true;
-        btn.innerText = "Finalizando viaje...";
+        btn.innerText = "Enviando datos... espere";
 
         try {
             const formData = new URLSearchParams();
             formData.append('accion', 'REGRESO');
-            formData.append('id_viaje', form.id_viaje.value);
+            formData.append('id_viaje', document.getElementById('f_id_viaje').value.trim());
             formData.append('km_ingreso', form.km_ingreso.value);
             
-            // Enviamos las fotos con el nombre que espera el script (foto_regreso_base64_X)
             archivosBase64.forEach((base64, index) => {
                 formData.append('foto_regreso_base64_' + (index + 1), base64);
             });
 
+            // Usamos POST con un pequeño truco de redirección para evitar bloqueos CORS y asegurar el registro
             await fetch(scriptURL, { 
                 method: 'POST', 
-                mode: 'no-cors', 
-                body: formData
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
             });
 
-            alert("✅ VIAJE FINALIZADO CORRECTAMENTE.\nEl registro se ha actualizado en la planilla.");
+            alert("✅ TRÁMITE COMPLETADO.\nSi el ID era correcto, los datos se verán reflejados en breve.");
             location.reload();
 
         } catch (error) {
-            alert("❌ Error al conectar con el servidor.");
+            console.error(error);
+            alert("❌ Error de conexión.");
             btn.disabled = false;
             btn.innerText = "REINTENTAR FINALIZAR";
         }
