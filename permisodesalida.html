@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Salida de Vehículos</title>
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #1a2a6c;
+            --accent: #b21f1f;
+            --success: #27ae60;
+            --bg: #f4f7f6;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            width: 100%;
+            max-width: 500px;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 3px solid var(--primary);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+
+        .header h1 {
+            color: var(--primary);
+            font-size: 1.4rem;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .form-group { margin-bottom: 15px; }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        .row { display: flex; gap: 10px; }
+        .row div { flex: 1; }
+
+        .camera-card {
+            border: 2px dashed #bbb;
+            background: #f9f9f9;
+            padding: 20px;
+            text-align: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .camera-card:hover { border-color: var(--primary); }
+        
+        #preview {
+            width: 100%;
+            margin-top: 10px;
+            border-radius: 10px;
+            display: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .sig-container {
+            border: 1px solid #ccc;
+            background: #fff;
+            border-radius: 8px;
+            margin-top: 5px;
+            touch-action: none;
+        }
+
+        canvas {
+            width: 100%;
+            height: 150px;
+            border-radius: 8px;
+        }
+
+        .btn-clear {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            margin-top: 5px;
+            cursor: pointer;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 18px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-top: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(26, 42, 108, 0.3);
+        }
+
+        .btn-submit:disabled { background: #bdc3c7; }
+
+        /* Modal para mostrar el ID generado */
+        #modalId {
+            display: none;
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 0 100px rgba(0,0,0,0.5);
+            text-align: center;
+            z-index: 1000;
+            width: 80%;
+            max-width: 400px;
+        }
+        .overlay {
+            display: none;
+            position: fixed;
+            top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 999;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="overlay" id="overlay"></div>
+<div id="modalId">
+    <h2 style="color: var(--success)">✅ ¡Salida Registrada!</h2>
+    <p>Este es tu código de viaje para el regreso:</p>
+    <h1 id="generatedID" style="background: #eee; padding: 10px; border-radius: 10px; color: var(--primary)">---</h1>
+    <p style="font-size: 0.8rem; color: #666;">Sacale una captura o anotalo.</p>
+    <button onclick="location.reload()" class="btn-submit">ENTENDIDO</button>
+</div>
+
+<div class="container">
+    <div class="header">
+        <h1>Permiso de Circulación</h1>
+    </div>
+
+    <form id="mainForm">
+        <input type="hidden" name="accion" value="SALIDA">
+
+        <div class="row">
+            <div class="form-group">
+                <label>FECHA</label>
+                <input type="date" name="fecha" id="f_fecha" readonly>
+            </div>
+            <div class="form-group">
+                <label>HORA SALIDA</label>
+                <input type="time" name="hora" id="f_hora" readonly>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>CONDUCTOR (Usuario)</label>
+            <input type="text" name="usuario" placeholder="Nombre completo" required>
+        </div>
+
+        <div class="form-group">
+            <label>ACOMPAÑANTES</label>
+            <input type="text" name="acompanantes" placeholder="Nombres o 'Sin acompañantes'">
+        </div>
+
+        <div class="form-group">
+            <label>VEHÍCULO</label>
+            <select name="vehiculo" required>
+                <option value="">Seleccionar unidad...</option>
+                <option value="Camioneta 01 - Toyota">Camioneta 01 (Hilux)</option>
+                <option value="Camioneta 02 - Ford">Camioneta 02 (Ranger)</option>
+                <option value="Camioneta 03 - VW">Camioneta 03 (Amarok)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>DESTINO</label>
+            <input type="text" name="destino" placeholder="Ej: Obra Norte / Cliente X" required>
+        </div>
+
+        <div class="form-group">
+            <label>KM DE EGRESO</label>
+            <input type="number" name="km_egreso" placeholder="Km actual del tablero" required>
+        </div>
+
+        <div class="form-group">
+            <label>FOTO DEL TABLERO (KM)</label>
+            <div class="camera-card" onclick="document.getElementById('f_foto').click();">
+                <span id="txt_foto">📷 Tocar para sacar foto</span>
+                <input type="file" id="f_foto" name="foto_salida" accept="image/*" capture="camera" style="display:none" required>
+            </div>
+            <img id="preview" alt="Vista previa">
+        </div>
+
+        <div class="form-group">
+            <label>FIRMA DIGITAL (Con el dedo)</label>
+            <div class="sig-container">
+                <canvas id="canvas_firma"></canvas>
+            </div>
+            <button type="button" class="btn-clear" id="btn_clear">Borrar y reintentar firma</button>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btn_send">ENVIAR Y FIRMAR</button>
+    </form>
+</div>
+
+<script>
+    // 1. Configurar Fecha y Hora actuales
+    const ahora = new Date();
+    document.getElementById('f_fecha').value = ahora.toISOString().split('T')[0];
+    document.getElementById('f_hora').value = ahora.getHours().toString().padStart(2, '0') + ':' + ahora.getMinutes().toString().padStart(2, '0');
+
+    // 2. Configurar el panel de Firma
+    const canvas = document.getElementById('canvas_firma');
+    const signaturePad = new SignaturePad(canvas, { backgroundColor: 'rgb(255, 255, 255)' });
+
+    function resizeCanvas() {
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = canvas.offsetWidth * ratio;
+        canvas.height = canvas.offsetHeight * ratio;
+        canvas.getContext("2d").scale(ratio, ratio);
+        signaturePad.clear();
+    }
+    window.onresize = resizeCanvas;
+    resizeCanvas();
+
+    document.getElementById('btn_clear').addEventListener('click', () => signaturePad.clear());
+
+    // 3. Previsualizar la foto de la cámara
+    document.getElementById('f_foto').onchange = function() {
+        const [file] = this.files;
+        if (file) {
+            document.getElementById('preview').src = URL.createObjectURL(file);
+            document.getElementById('preview').style.display = 'block';
+            document.getElementById('txt_foto').innerText = "Foto cargada ✅";
+        }
+    };
+
+    // 4. Enviar datos a Google Apps Script
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbyEIGQlPc1DehfHYhVnW1YXoUFR_9C9MfPy2kvUXvFadXChN5kdD5Rr7Gg72Gdy2-M4/exec'; 
+    const form = document.getElementById('mainForm');
+
+    form.addEventListener('submit', e => {
+        e.preventDefault();
+        
+        if (signaturePad.isEmpty()) {
+            alert("Por favor, firma el permiso antes de enviar.");
+            return;
+        }
+
+        const btn = document.getElementById('btn_send');
+        btn.disabled = true;
+        btn.innerText = "Procesando...";
+
+        const formData = new FormData(form);
+        formData.append('firma_archivo', signaturePad.toDataURL());
+
+        fetch(scriptURL, { method: 'POST', body: formData})
+            .then(response => response.text()) // Leemos el ID que nos devuelve el Script
+            .then(idGenerado => {
+                // Mostrar el ID en el modal
+                document.getElementById('generatedID').innerText = idGenerado;
+                document.getElementById('modalId').style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+            })
+            .catch(error => {
+                alert("❌ Error al enviar. Verificá tu conexión.");
+                btn.disabled = false;
+                btn.innerText = "REINTENTAR ENVÍO";
+            });
+    });
+</script>
+
+</body>
+</html>
