@@ -79,12 +79,20 @@
 
         .camera-card:hover { border-color: var(--primary); }
         
-        #preview {
-            width: 100%;
+        /* Contenedor de miniaturas */
+        #galeria_preview {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
             margin-top: 10px;
-            border-radius: 10px;
-            display: none;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .preview-img {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
         .sig-container {
@@ -213,12 +221,12 @@
         </div>
 
         <div class="form-group">
-            <label>FOTO DEL TABLERO (KM)</label>
-            <div class="camera-card" onclick="document.getElementById('f_foto').click();">
-                <span id="txt_foto">📷 Tocar para sacar foto</span>
-                <input type="file" id="f_foto" accept="image/*" capture="camera" style="display:none">
+            <label>FOTOS DEL ESTADO (Máximo 5)</label>
+            <div class="camera-card" onclick="document.getElementById('f_fotos').click();">
+                <span id="txt_foto">📷 Tocar para sacar/elegir fotos</span>
+                <input type="file" id="f_fotos" accept="image/*" capture="camera" multiple style="display:none">
             </div>
-            <img id="preview" alt="Vista previa">
+            <div id="galeria_preview"></div>
         </div>
 
         <div class="form-group">
@@ -255,17 +263,31 @@
 
     document.getElementById('btn_clear').addEventListener('click', () => signaturePad.clear());
 
-    // 3. Previsualizar la foto de la cámara
-    document.getElementById('f_foto').onchange = function() {
-        const [file] = this.files;
-        if (file) {
-            document.getElementById('preview').src = URL.createObjectURL(file);
-            document.getElementById('preview').style.display = 'block';
-            document.getElementById('txt_foto').innerText = "Foto cargada ✅";
+    // 3. Manejo de múltiples fotos y previsualización
+    const inputFotos = document.getElementById('f_fotos');
+    const galeria = document.getElementById('galeria_preview');
+    let archivosBase64 = [];
+
+    inputFotos.onchange = async function() {
+        galeria.innerHTML = ""; // Limpiar vista previa anterior
+        archivosBase64 = [];
+        const files = Array.from(this.files).slice(0, 5); // Limitar a 5 fotos
+
+        for (const file of files) {
+            // Mostrar miniatura
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.className = 'preview-img';
+            galeria.appendChild(img);
+
+            // Convertir a Base64
+            const base64 = await toBase64(file);
+            archivosBase64.push(base64);
         }
+        document.getElementById('txt_foto').innerText = archivosBase64.length + " fotos cargadas ✅";
     };
 
-    // 4. Función para convertir archivo a Base64 (Mejora Crítica)
+    // 4. Función para convertir archivo a Base64
     function toBase64(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -276,7 +298,7 @@
     }
 
     // 5. Enviar datos a Google Apps Script
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbzzeG9Dr-9BmMA11UpfGzvpRuU4nWfV-hS9FyaOREu9tn3wo972WKfRNmRboS0zYvRT/exec'; 
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbxa5vN8mnjmOgHCkmXN9LHTr_sHeRiCEQZUW4yNDT51nj1M3Q5uXZYHVr3Dx37ML3wr/exec'; 
     const form = document.getElementById('mainForm');
 
     form.addEventListener('submit', async e => {
@@ -289,12 +311,11 @@
 
         const btn = document.getElementById('btn_send');
         btn.disabled = true;
-        btn.innerText = "Subiendo foto y firma...";
+        btn.innerText = "Subiendo datos y " + archivosBase64.length + " fotos...";
 
         try {
             const formData = new URLSearchParams();
             
-            // Campos normales
             formData.append('accion', 'SALIDA');
             formData.append('usuario', form.usuario.value);
             formData.append('acompanantes', form.acompanantes.value);
@@ -302,25 +323,21 @@
             formData.append('destino', form.destino.value);
             formData.append('km_egreso', form.km_egreso.value);
             
-            // Procesar Foto si existe
-            const fotoInput = document.getElementById('f_foto');
-            if (fotoInput.files.length > 0) {
-                const base64Foto = await toBase64(fotoInput.files[0]);
-                formData.append('foto_base64', base64Foto);
-            }
+            // Añadir cada foto con una clave única (foto_base64_1, foto_base64_2, etc.)
+            archivosBase64.forEach((base64, index) => {
+                formData.append('foto_base64_' + (index + 1), base64);
+            });
 
             // Procesar Firma
             formData.append('firma_archivo', signaturePad.toDataURL());
 
             // Enviar vía POST
-            const response = await fetch(scriptURL, { 
+            await fetch(scriptURL, { 
                 method: 'POST', 
-                mode: 'no-cors', // Importante para evitar problemas de CORS en GitHub
+                mode: 'no-cors', 
                 body: formData
             });
 
-            // Como usamos no-cors, no podemos leer el cuerpo de la respuesta directamente.
-            // Generamos un ID visual para el usuario basado en el tiempo
             const idTemporal = "V-" + Date.now();
             document.getElementById('generatedID').innerText = idTemporal;
             document.getElementById('modalId').style.display = 'block';
