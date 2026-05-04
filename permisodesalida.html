@@ -280,11 +280,11 @@
     resizeCanvas();
     document.getElementById('btn_clear').addEventListener('click', () => signaturePad.clear());
 
-    // 3. LÓGICA DE ACUMULACIÓN DE FOTOS
+    // 3. LÓGICA DE FOTOS ACUMULADAS
     const inputFotos = document.getElementById('f_fotos');
     const galeria = document.getElementById('galeria_preview');
     const btnCamara = document.getElementById('btn_camara');
-    let archivosBase64 = []; // Aquí guardaremos las fotos acumuladas
+    let archivosBase64 = []; 
 
     btnCamara.onclick = () => {
         if (archivosBase64.length >= 5) {
@@ -298,12 +298,10 @@
         const file = this.files[0];
         if (!file) return;
 
-        // Convertir a Base64 y guardar en el array
         const base64 = await toBase64(file);
         archivosBase64.push(base64);
-        
         actualizarGaleria();
-        this.value = ""; // Limpiar el input para permitir sacar otra foto
+        this.value = ""; 
     };
 
     function actualizarGaleria() {
@@ -311,11 +309,9 @@
         archivosBase64.forEach((base64, index) => {
             const container = document.createElement('div');
             container.className = 'preview-container';
-            
             const img = document.createElement('img');
             img.src = base64;
             img.className = 'preview-img';
-            
             const btnDel = document.createElement('button');
             btnDel.innerText = "X";
             btnDel.className = 'btn-remove';
@@ -324,12 +320,10 @@
                 archivosBase64.splice(index, 1);
                 actualizarGaleria();
             };
-
             container.appendChild(img);
             container.appendChild(btnDel);
             galeria.appendChild(container);
         });
-
         document.getElementById('txt_foto').innerText = archivosBase64.length + " de 5 fotos cargadas";
     }
 
@@ -342,8 +336,8 @@
         });
     }
 
-    // 4. ENVÍO DE DATOS
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbxa5vN8mnjmOgHCkmXN9LHTr_sHeRiCEQZUW4yNDT51nj1M3Q5uXZYHVr3Dx37ML3wr/exec'; 
+    // 4. ENVÍO DE DATOS Y RECEPCIÓN DE ID REAL
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbwijLmSat2O9G240MWWDRvxBk5wuUfucz_p2xa_rAVNaPx05Cl9KRn5DkTAsSAe5c9R/exec'; 
     const form = document.getElementById('mainForm');
 
     form.addEventListener('submit', async e => {
@@ -356,7 +350,7 @@
 
         const btn = document.getElementById('btn_send');
         btn.disabled = true;
-        btn.innerText = "Subiendo todo...";
+        btn.innerText = "Registrando en Sistema...";
 
         try {
             const formData = new URLSearchParams();
@@ -367,27 +361,32 @@
             formData.append('destino', form.destino.value);
             formData.append('km_egreso', form.km_egreso.value);
             
-            // Añadir las fotos acumuladas al envío
             archivosBase64.forEach((base64, index) => {
                 formData.append('foto_base64_' + (index + 1), base64);
             });
-
             formData.append('firma_archivo', signaturePad.toDataURL());
 
-            await fetch(scriptURL, { 
+            // Enviamos y ESPERAMOS respuesta (sin no-cors)
+            const response = await fetch(scriptURL, { 
                 method: 'POST', 
-                mode: 'no-cors', 
                 body: formData
             });
 
-            const idTemporal = "V-" + Date.now();
-            document.getElementById('generatedID').innerText = idTemporal;
-            document.getElementById('modalId').style.display = 'block';
-            document.getElementById('overlay').style.display = 'block';
+            const idReal = await response.text(); 
+
+            if (idReal && idReal.includes("V-")) {
+                document.getElementById('generatedID').innerText = idReal;
+                document.getElementById('modalId').style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+            } else {
+                throw new Error("Respuesta inesperada del servidor");
+            }
 
         } catch (error) {
-            alert("Error al enviar.");
+            console.error(error);
+            alert("Error al registrar. Intenta nuevamente.");
             btn.disabled = false;
+            btn.innerText = "ENVIAR Y FIRMAR";
         }
     });
 </script>
